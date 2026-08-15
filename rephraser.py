@@ -26,7 +26,7 @@ class Handler:
         self._keyboard.release("c")
         self._keyboard.release(Key.cmd)
         time.sleep(0.1)
-        return pyperclip.paste()
+        return pyperclip.paste().strip()
 
     def handle(self):
         selected_text = self._get_selected_text()
@@ -37,6 +37,11 @@ class Handler:
         rephrased_text = ask_llm(
             client=self._openai_client, model=self._model, system_prompt=self._system_prompt, text=selected_text
         )
+
+        if rephrased_text == selected_text:
+            play_sound("Hero")
+            pyperclip.copy("")
+            return
 
         pyperclip.copy(rephrased_text)
         play_sound("Bottle")
