@@ -1,10 +1,15 @@
+import logging
 import subprocess
 import time
+from difflib import SequenceMatcher
 
 import pyperclip
 from openai import OpenAI
 from pynput import keyboard
 from pynput.keyboard import Controller, Key
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 client = OpenAI(
     base_url="http://localhost:11434/v1",
@@ -40,6 +45,8 @@ The output must be either:
 2. The corrected A2-level text, if corrections are needed.
 """
 
+keyboard_ = Controller()
+
 def play_sound(name: str) -> None:
     subprocess.Popen(
         [
@@ -54,7 +61,6 @@ def play_sound(name: str) -> None:
 def get_selected_text() -> str:
     original_clipboard = pyperclip.paste()
 
-    keyboard_ = Controller()
     keyboard_.press(Key.cmd)
     keyboard_.press("c")
     keyboard_.release("c")
@@ -87,24 +93,65 @@ def rephrase_text(text: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-def replace_selected_text(text: str) -> None:
-    keyboard_ = Controller()
-    keyboard_.type(text)
+
+def apply_diff(current: str, target: str):
+    sm = SequenceMatcher(None, current, target)
+    opcodes = sm.get_opcodes()
+    pos = 0
+
+    for tag, i1, i2, j1, j2 in opcodes:
+        if tag == 'equal':
+            length = i2 - i1
+            for _ in range(length):
+                keyboard_.press(Key.right)
+                keyboard_.release(Key.right)
+                time.sleep(0.075)
+            pos += length
+
+        elif tag == 'delete':
+            length = i2 - i1
+            for _ in range(length):
+                keyboard_.press(Key.delete)
+                keyboard_.release(Key.delete)
+                time.sleep(0.075)
+        elif tag == 'insert':
+            text = target[j1:j2]
+            for symbol in text:
+                keyboard_.type(symbol)
+                time.sleep(0.075)
+            pos += len(text)
+
+        elif tag == 'replace':
+            length = i2 - i1
+            for _ in range(length):
+                keyboard_.press(Key.delete)
+                keyboard_.release(Key.delete)
+                time.sleep(0.075)
+            text = target[j1:j2]
+            keyboard_.type(text)
+            pos += len(text)
 
 
 def on_activate():
     selected_text = get_selected_text()
+    logger.info("Selected text: %s", selected_text)
 
     if not selected_text:
+        logger.warning("No text selected")
         return
 
     play_sound("Tink")
-    result = rephrase_text(selected_text)
-    if selected_text == result:
+    rephrased_text = rephrase_text(selected_text)
+
+    if selected_text == rephrased_text:
         play_sound("Funk")
         return
 
-    replace_selected_text(result)
+    # Сворачиваем выделение в начало (курсор становится в начале бывшего selection)
+    keyboard_.press(Key.left)
+    keyboard_.release(Key.left)
+    time.sleep(0.02)
+    apply_diff(selected_text, rephrased_text)
 
 
 hotkey = keyboard.HotKey(
@@ -116,6 +163,6 @@ hotkey = keyboard.HotKey(
 if __name__ == "__main__":
     with keyboard.Listener(
             on_press=hotkey.press,
-           on_release=hotkey.release,
+            on_release=hotkey.release,
     ) as listener:
         listener.join()
