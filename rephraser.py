@@ -7,6 +7,8 @@ from openai import OpenAI
 from pynput import keyboard
 from pynput.keyboard import Controller, Key
 
+from prompts import TRANSLATE_TO_RUSSIAN_SYSTEM_PROMPT, CORRECT_ENGLISH_SYSTEM_PROMPT
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -16,105 +18,80 @@ client = OpenAI(
 )
 
 MODEL = "translategemma:12b"
-SYSTEM_PROMPT = """
-You are an English teacher helping an A2 (Pre-Intermediate) English learner.
-
-Check the text provided by the user.
-
-Your task:
-- If the text is correct and natural, return it EXACTLY unchanged.
-- If the text contains grammar mistakes, incorrect words, unnatural expressions, or Russian words that should be in English, correct them.
-- When correcting the text, use simple and natural A2-level English.
-
-Rules:
-- Preserve the original meaning exactly.
-- Do not add or remove information.
-- Do not rewrite text that is already correct.
-- Do not simplify correct sentences just because they could be written in simpler English.
-- Make only necessary corrections.
-- Do not use rare words or unnecessary idioms.
-- Preserve names, dates, numbers, URLs, and Obsidian Markdown formatting.
-- Preserve the original Markdown structure.
-- If Russian text appears inside the text, translate it into English when necessary.
-- Return ONLY the resulting text.
-- Do not add explanations, comments, labels, quotes, or Markdown code fences.
-
-The output must be either:
-1. The original text, character-for-character unchanged, if no correction is needed.
-2. The corrected A2-level text, if corrections are needed.
-"""
-
-keyboard_ = Controller()
-
-def play_sound(name: str) -> None:
-    subprocess.Popen(
-        [
-            "afplay",
-            f"/System/Library/Sounds/{name}.aiff",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
 
 
-def get_selected_text() -> str:
-    original_clipboard = pyperclip.paste()
+class Handler:
 
-    keyboard_.press(Key.cmd)
-    keyboard_.press("c")
-    keyboard_.release("c")
-    keyboard_.release(Key.cmd)
+    def __init__(self, system_prompt: str) -> None:
+        self._system_prompt = system_prompt
+        self._keyboard = Controller()
 
-    time.sleep(0.05)
+    def _get_selected_text(self) -> str:
+        original_clipboard = pyperclip.paste()
 
-    selected_text = pyperclip.paste()
+        self._keyboard.press(Key.cmd)
+        self._keyboard.press("c")
+        self._keyboard.release("c")
+        self._keyboard.release(Key.cmd)
 
-    pyperclip.copy(original_clipboard)
+        time.sleep(0.1)
 
-    return selected_text
+        selected_text = pyperclip.paste()
 
+        pyperclip.copy(original_clipboard)
 
-def rephrase_text(text: str) -> str:
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": text,
-            },
-        ],
-    )
+        return selected_text
 
-    return response.choices[0].message.content.strip()
+    def _play_sound(self, name: str) -> None:
+        subprocess.Popen(
+            [
+                "afplay",
+                f"/System/Library/Sounds/{name}.aiff",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
-def on_activate():
-    selected_text = get_selected_text()
-    logger.info("Selected text: %s", selected_text)
+    def _rephrase_text(self, text: str) -> str:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": self._system_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ],
+        )
 
-    if not selected_text:
-        logger.warning("No text selected")
-        return
+        return response.choices[0].message.content.strip()
 
-    play_sound("Tink")
-    rephrased_text = rephrase_text(selected_text)
+    def handle(self):
+        selected_text = self._get_selected_text()
+        logger.info("Selected text: %s", selected_text)
 
-    pyperclip.copy(rephrased_text)
-    play_sound("Funk")
+        if not selected_text:
+            logger.warning("No text selected")
+            return
 
+        self._play_sound("Funk")
+        rephrased_text = self._rephrase_text(selected_text)
 
-hotkey = keyboard.HotKey(
-    keyboard.HotKey.parse("<ctrl>+<cmd>+r"),
-    on_activate,
-)
+        pyperclip.copy(rephrased_text)
+        self._play_sound("Bottle")
 
 
 if __name__ == "__main__":
-    with keyboard.Listener(
-            on_press=hotkey.press,
-            on_release=hotkey.release,
-    ) as listener:
+    translate_to_russian_handler = Handler(system_prompt=TRANSLATE_TO_RUSSIAN_SYSTEM_PROMPT)
+    correct_english_handler = Handler(system_prompt=CORRECT_ENGLISH_SYSTEM_PROMPT)
+
+    hotkeys = {
+        '<ctrl>+<cmd>+r': translate_to_russian_handler.handle,
+        '<ctrl>+<cmd>+e': correct_english_handler.handle,
+    }
+
+    with keyboard.GlobalHotKeys(hotkeys) as listener:
         listener.join()
