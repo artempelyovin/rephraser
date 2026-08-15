@@ -1,7 +1,6 @@
 import logging
 import subprocess
 import time
-from difflib import SequenceMatcher
 
 import pyperclip
 from openai import OpenAI
@@ -92,46 +91,6 @@ def rephrase_text(text: str) -> str:
 
     return response.choices[0].message.content.strip()
 
-
-
-def apply_diff(current: str, target: str):
-    sm = SequenceMatcher(None, current, target)
-    opcodes = sm.get_opcodes()
-    pos = 0
-
-    for tag, i1, i2, j1, j2 in opcodes:
-        if tag == 'equal':
-            length = i2 - i1
-            for _ in range(length):
-                keyboard_.press(Key.right)
-                keyboard_.release(Key.right)
-                time.sleep(0.075)
-            pos += length
-
-        elif tag == 'delete':
-            length = i2 - i1
-            for _ in range(length):
-                keyboard_.press(Key.delete)
-                keyboard_.release(Key.delete)
-                time.sleep(0.075)
-        elif tag == 'insert':
-            text = target[j1:j2]
-            for symbol in text:
-                keyboard_.type(symbol)
-                time.sleep(0.075)
-            pos += len(text)
-
-        elif tag == 'replace':
-            length = i2 - i1
-            for _ in range(length):
-                keyboard_.press(Key.delete)
-                keyboard_.release(Key.delete)
-                time.sleep(0.075)
-            text = target[j1:j2]
-            keyboard_.type(text)
-            pos += len(text)
-
-
 def on_activate():
     selected_text = get_selected_text()
     logger.info("Selected text: %s", selected_text)
@@ -143,15 +102,8 @@ def on_activate():
     play_sound("Tink")
     rephrased_text = rephrase_text(selected_text)
 
-    if selected_text == rephrased_text:
-        play_sound("Funk")
-        return
-
-    # Сворачиваем выделение в начало (курсор становится в начале бывшего selection)
-    keyboard_.press(Key.left)
-    keyboard_.release(Key.left)
-    time.sleep(0.02)
-    apply_diff(selected_text, rephrased_text)
+    pyperclip.copy(rephrased_text)
+    play_sound("Funk")
 
 
 hotkey = keyboard.HotKey(
