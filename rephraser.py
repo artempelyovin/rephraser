@@ -1,3 +1,4 @@
+import subprocess
 import time
 
 import pyperclip
@@ -11,6 +12,43 @@ client = OpenAI(
 )
 
 MODEL = "translategemma:12b"
+SYSTEM_PROMPT = """
+You are an English teacher helping an A2 (Pre-Intermediate) English learner.
+
+Check the text provided by the user.
+
+Your task:
+- If the text is correct and natural, return it EXACTLY unchanged.
+- If the text contains grammar mistakes, incorrect words, unnatural expressions, or Russian words that should be in English, correct them.
+- When correcting the text, use simple and natural A2-level English.
+
+Rules:
+- Preserve the original meaning exactly.
+- Do not add or remove information.
+- Do not rewrite text that is already correct.
+- Do not simplify correct sentences just because they could be written in simpler English.
+- Make only necessary corrections.
+- Do not use rare words or unnecessary idioms.
+- Preserve names, dates, numbers, URLs, and Obsidian Markdown formatting.
+- Preserve the original Markdown structure.
+- If Russian text appears inside the text, translate it into English when necessary.
+- Return ONLY the resulting text.
+- Do not add explanations, comments, labels, quotes, or Markdown code fences.
+
+The output must be either:
+1. The original text, character-for-character unchanged, if no correction is needed.
+2. The corrected A2-level text, if corrections are needed.
+"""
+
+def play_sound(name: str) -> None:
+    subprocess.Popen(
+        [
+            "afplay",
+            f"/System/Library/Sounds/{name}.aiff",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def get_selected_text() -> str:
@@ -32,23 +70,16 @@ def get_selected_text() -> str:
 
 
 def rephrase_text(text: str) -> str:
-    prompt = f"""
-Rewrite the following text to make it more natural and clear.
-
-Keep the original meaning.
-Do not add any explanations.
-Return only the rewritten text.
-
-Text:
-{text}
-"""
-
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
             {
+                "role": "system",
+                "content": SYSTEM_PROMPT,
+            },
+            {
                 "role": "user",
-                "content": prompt,
+                "content": text,
             },
         ],
     )
@@ -67,7 +98,11 @@ def on_activate():
     if not selected_text:
         return
 
+    play_sound("Tink")
     result = rephrase_text(selected_text)
+    if selected_text == result:
+        play_sound("Funk")
+        return
 
     replace_selected_text(result)
 
@@ -77,11 +112,10 @@ hotkey = keyboard.HotKey(
     on_activate,
 )
 
-# Это настоящий и очень важный тест
 
 if __name__ == "__main__":
     with keyboard.Listener(
             on_press=hotkey.press,
-            on_release=hotkey.release,
+           on_release=hotkey.release,
     ) as listener:
         listener.join()
