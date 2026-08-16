@@ -17,6 +17,7 @@ Rules:
 - Do not use rare words or unnecessary idioms.
 - Preserve names, dates, numbers, URLs, and Obsidian Markdown formatting.
 - Preserve the original Markdown structure.
+- Don’t put a period at the end of the text if there isn’t one.
 - If Russian text appears inside the text, translate it into English when necessary.
 - Return ONLY the resulting text.
 - Do not add explanations, comments, labels, quotes, or Markdown code fences.
@@ -35,6 +36,7 @@ Rules:
 - Do not add or remove information.
 - Preserve names, dates, numbers, URLs, and Obsidian Markdown formatting.
 - Preserve the original Markdown structure.
+- Don’t put a period at the end of the text if there isn’t one.
 - Translate all text that is not Russian into Russian.
 - If the text is already in Russian, return it exactly unchanged.
 - Use natural and fluent Russian.
