@@ -1,8 +1,9 @@
 import sys
 import time
 
-from PySide6.QtCore import Qt, QObject, Signal, QTimer
+from PySide6.QtCore import Qt, QObject, Signal, QTimer, QUrl
 from PySide6.QtGui import QCursor, QGuiApplication
+from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
 
 from pynput import keyboard
@@ -56,6 +57,13 @@ class Overlay(QWidget):
 
         super().__init__(None, flags)
 
+        self._start_effect = QSoundEffect()
+        self._start_effect.setSource(QUrl.fromLocalFile("media/start.wav"))
+        self._finish_effect = QSoundEffect()
+        self._finish_effect.setSource(QUrl.fromLocalFile("media/finish.wav"))
+        self._error_effect = QSoundEffect()
+        self._error_effect.setSource(QUrl.fromLocalFile("media/error.wav"))
+
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFocusPolicy(Qt.NoFocus)
@@ -87,12 +95,14 @@ class Overlay(QWidget):
     def show_text(self, text: str) -> None:
         text = (text or "").strip()
         if not text:
+            self._error_effect.play()
             return
 
         # На случай очень большого выделения.
         if len(text) > 800:
             text = text[:800] + "…"
 
+        self._start_effect.play()
         self._label.setText(text)
         self.adjustSize()
 
@@ -110,8 +120,10 @@ class Overlay(QWidget):
         x = max(geo.left(), min(x, geo.right() - self.width()))
         y = max(geo.top(), min(y, geo.bottom() - self.height()))
 
+        time.sleep(1.5)
         self.move(x, y)
         self.show()
+        self._finish_effect.play()
 
         # Плашка исчезает через 2.5 секунды.
         self._timer.start(2500)
