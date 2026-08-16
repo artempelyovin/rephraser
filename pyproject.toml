@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "openai>=3.1.0",
-    "pyautogui>=0.9.54",
     "pynput>=1.8.2",
     "pyperclip>=1.11.0",
 ]
